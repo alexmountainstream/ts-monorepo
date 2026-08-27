@@ -1,5 +1,13 @@
 {
   "name": "mobile",
   "version": "0.0.0",
-  "private": true
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint",
+    "format": "oxfmt"
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  }
 }

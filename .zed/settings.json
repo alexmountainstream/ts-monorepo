@@ -1,0 +1,27 @@
+{
+  "file_scan_exclusions": ["repos/**"],
+
+  "lsp": {
+    "typescript-language-server": {
+      "initialization_options": {
+        "preferences": {
+          "autoImportFileExcludePatterns": ["repos/**"]
+        }
+      }
+    },
+    "vtsls": {
+      "initialization_options": {
+        "typescript": {
+          "preferences": {
+            "autoImportFileExcludePatterns": ["repos/**"]
+          }
+        },
+        "javascript": {
+          "preferences": {
+            "autoImportFileExcludePatterns": ["repos/**"]
+          }
+        }
+      }
+    }
+  }
+}
