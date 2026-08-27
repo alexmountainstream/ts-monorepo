@@ -9,9 +9,13 @@ import { TodoRepository } from "./TodoRepository";
 
 const port = Number(process.env.PORT ?? 3000);
 
-const ApiLive = HttpApiBuilder.layer(TodoApi).pipe(
-  Layer.provide(TodoApiGroupLive),
-  Layer.provide(HttpApiScalar.layer(TodoApi)),
+const ApiLive = Layer.mergeAll(
+  HttpApiBuilder.layer(TodoApi).pipe(
+    Layer.provide(TodoApiGroupLive),
+    Layer.provide(HttpApiScalar.layer(TodoApi)),
+  ),
+  HttpRouter.cors(),
+).pipe(
   HttpRouter.serve,
   Layer.provide(TodoRepository.layer),
   Layer.provide(NodeHttpServer.layer(createServer, { port })),

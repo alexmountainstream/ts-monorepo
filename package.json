@@ -5,9 +5,7 @@
   "scripts": {
     "typecheck": "pnpm -r run typecheck",
     "lint": "pnpm -r run lint",
-    "lint:root": "oxlint --disable-nested-config",
     "format": "pnpm -r run format",
-    "format:root": "oxfmt",
     "prepare": "effect-tsgo patch --no-typescript --oxlint"
   },
   "dependencies": {
