@@ -3,8 +3,10 @@ packages:
   - "packages/*"
 catalog:
   effect: 4.0.0-rc.112
+  "@effect/platform-node": 4.0.0-rc.112
 allowBuilds:
-  msgpackr-extract: set this to true or false
+  esbuild: true
+  msgpackr-extract: true
 minimumReleaseAgeExclude:
   - "@effect/tsgo-darwin-arm64@0.38.0"
   - "@effect/tsgo-darwin-x64@0.38.0"
