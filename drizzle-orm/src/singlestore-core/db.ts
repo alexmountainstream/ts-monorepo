@@ -8,9 +8,12 @@ import { SelectionProxyHandler } from '~/selection-proxy.ts';
 import type { SingleStoreDriverDatabase } from '~/singlestore/driver.ts';
 import { type ColumnsSelection, type SQL, sql, type SQLWrapper } from '~/sql/sql.ts';
 import { WithSubquery } from '~/subquery.ts';
+import type { InferInsertModel, RequiredInsertKeys } from '~/table.ts';
+import type { DrizzleTypeError, IsNever, JoinUnion } from '~/utils.ts';
 import type { SingleStoreDialect } from './dialect.ts';
 import { SingleStoreCountBuilder } from './query-builders/count.ts';
 import {
+	type NoDuplicateColumns,
 	QueryBuilder,
 	SingleStoreDeleteBase,
 	SingleStoreInsertBuilder,
@@ -21,6 +24,7 @@ import { RelationalQueryBuilder } from './query-builders/query.ts';
 import type { SelectedFields } from './query-builders/select.types.ts';
 import type {
 	PreparedQueryHKTBase,
+	SingleStorePreparedQueryConfig,
 	SingleStoreQueryResultHKT,
 	SingleStoreQueryResultKind,
 	SingleStoreSession,
@@ -453,12 +457,32 @@ export class SingleStoreDatabase<
 	 *
 	 * // Insert multiple rows
 	 * await db.insert(cars).values([{ brand: 'BMW' }, { brand: 'Porsche' }]);
+	 *
+	 * // Insert only selected columns
+	 * await db.insert(cars, 'brand', 'productionYear').values([{ brand: 'BMW', productionYear: 1995 }, { brand: 'Porsche', productionYear: 1989 }]);
 	 * ```
 	 */
+	insert<
+		TTable extends SingleStoreTable,
+		TColumnList extends (keyof InferInsertModel<TTable>)[] = [],
+		TRequiredKeys extends string = RequiredInsertKeys<TTable>,
+	>(
+		table: TTable,
+		...columns: TColumnList extends [] ? []
+			: IsNever<TRequiredKeys> extends true ? TColumnList & NoDuplicateColumns<TColumnList>
+			: [TRequiredKeys] extends [TColumnList[number]] ? TColumnList & NoDuplicateColumns<TColumnList>
+			: DrizzleTypeError<
+				`Column selection is missing following required columns: ${JoinUnion<
+					`"${Exclude<TRequiredKeys, TColumnList[number]>}"`,
+					', '
+				>}`
+			>[]
+	): SingleStoreInsertBuilder<TTable, TQueryResult, TPreparedQueryHKT, TColumnList extends [] ? 'all' : TColumnList>;
 	insert<TTable extends SingleStoreTable>(
 		table: TTable,
+		...columns: string[]
 	): SingleStoreInsertBuilder<TTable, TQueryResult, TPreparedQueryHKT> {
-		return new SingleStoreInsertBuilder(table, this.session, this.dialect);
+		return new SingleStoreInsertBuilder(table, this.session, this.dialect, columns.length ? columns : undefined);
 	}
 
 	/**
@@ -486,10 +510,30 @@ export class SingleStoreDatabase<
 		return new SingleStoreDeleteBase(table, this.session, this.dialect);
 	}
 
+	execute<TRow extends unknown[] = unknown[]>(
+		query: SQLWrapper | string,
+		mode: 'arrays',
+	): Promise<TRow[]>;
+	execute<TRow extends Record<string, unknown> = Record<string, unknown>>(
+		query: SQLWrapper | string,
+		mode: 'objects',
+	): Promise<TRow[]>;
 	execute<T extends { [column: string]: any } = ResultSetHeader>(
 		query: SQLWrapper | string,
-	): Promise<SingleStoreQueryResultKind<TQueryResult, T>> {
-		return this.session.execute(typeof query === 'string' ? sql.raw(query) : query.getSQL());
+		mode?: 'raw' | undefined,
+	): Promise<SingleStoreQueryResultKind<TQueryResult, T>>;
+	execute(
+		query: SQLWrapper | string,
+		mode?: 'raw' | 'objects' | 'arrays' | undefined,
+	): unknown {
+		const sequel = typeof query === 'string' ? sql.raw(query) : query.getSQL();
+		return this.session.prepareQuery<
+			SingleStorePreparedQueryConfig & { execute: unknown },
+			PreparedQueryHKTBase
+		>(
+			this.dialect.sqlToQuery(sequel),
+			mode ?? 'raw',
+		).execute();
 	}
 
 	$cache: { invalidate: Cache['onMutate'] };
@@ -520,9 +564,9 @@ export const withReplicas = <
 	const $with: Q['with'] = (...args: []) => getReplica(replicas).with(...args);
 
 	const update: Q['update'] = (...args: [any]) => primary.update(...args);
-	const insert: Q['insert'] = (...args: [any]) => primary.insert(...args);
+	const insert: Q['insert'] = ((...args: [any]) => primary.insert(...args)) as Q['insert'];
 	const $delete: Q['delete'] = (...args: [any]) => primary.delete(...args);
-	const execute: Q['execute'] = (...args: [any]) => primary.execute(...args);
+	const execute: Q['execute'] = ((...args: [any]) => primary.execute(...args)) as Q['execute'];
 	const transaction: Q['transaction'] = (...args: [any, any]) => primary.transaction(...args);
 
 	return {
