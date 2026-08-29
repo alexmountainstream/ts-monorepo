@@ -4,6 +4,8 @@ import { TodoApi } from "@ts-monorepo/domain";
 import { HttpRouter } from "effect/unstable/http";
 import { HttpApiBuilder, HttpApiScalar } from "effect/unstable/httpapi";
 import { createServer } from "node:http";
+import { Database } from "./db/Database";
+import { MigrationsLive } from "./db/MigrationsLive";
 import { TodoApiGroupLive } from "./TodoApiLive";
 import { TodoRepository } from "./TodoRepository";
 
@@ -18,6 +20,8 @@ const ApiLive = Layer.mergeAll(
 ).pipe(
   HttpRouter.serve,
   Layer.provide(TodoRepository.layer),
+  Layer.provide(MigrationsLive),
+  Layer.provide(Database.layer),
   Layer.provide(NodeHttpServer.layer(createServer, { port })),
 );
 

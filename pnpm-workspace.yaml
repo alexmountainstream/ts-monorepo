@@ -4,6 +4,7 @@ packages:
 catalog:
   effect: 4.0.0-rc.112
   "@effect/platform-node": 4.0.0-rc.112
+  "@effect/sql-pg": 4.0.0-rc.112
 allowBuilds:
   esbuild: true
   msgpackr-extract: true
