@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" --if-present run dev",
     "typecheck": "pnpm -r run typecheck",
     "lint": "pnpm -r run lint",
     "format": "pnpm -r run format",
