@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { Context, DateTime, Effect, Layer, Schema } from "effect";
+import { Context, DateTime, Effect, Layer, Schema, Array, Option } from "effect";
 import {
   type CreateTodoInput,
   Todo,
@@ -8,21 +8,12 @@ import {
   type UpdateTodoInput,
 } from "@ts-monorepo/domain";
 import { Database } from "./db/Database";
-import { todos, type TodoRow } from "./db/schema";
-
-const toTodo = (row: TodoRow): Todo =>
-  new Todo({
-    id: Schema.decodeSync(TodoId)(row.id),
-    title: row.title,
-    completed: row.completed,
-    createdAt: DateTime.fromDateUnsafe(row.createdAt),
-    updatedAt: DateTime.fromDateUnsafe(row.updatedAt),
-  });
+import { todos } from "./db/schema";
 
 export class TodoRepository extends Context.Service<
   TodoRepository,
   {
-    readonly list: Effect.Effect<Array<Todo>>;
+    readonly list: Effect.Effect<ReadonlyArray<Todo>>;
     readonly findById: (id: TodoId) => Effect.Effect<Todo, TodoNotFoundError>;
     readonly create: (input: CreateTodoInput) => Effect.Effect<Todo>;
     readonly update: (id: TodoId, input: UpdateTodoInput) => Effect.Effect<Todo, TodoNotFoundError>;
@@ -38,27 +29,40 @@ export class TodoRepository extends Context.Service<
         .select()
         .from(todos)
         .pipe(
-          Effect.map((rows) => rows.map(toTodo)),
+          Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(Todo))),
           Effect.orDie,
         );
 
       const findById = Effect.fn("TodoRepository.findById")(function* (id: TodoId) {
-        const rows = yield* db.select().from(todos).where(eq(todos.id, id)).pipe(Effect.orDie);
-        const row = rows[0];
-        if (row === undefined) {
-          return yield* new TodoNotFoundError({ id });
-        }
-        return toTodo(row);
+        const result = yield* db
+          .select()
+          .from(todos)
+          .where(eq(todos.id, id))
+          .pipe(
+            Effect.map(Array.head),
+            Effect.orDie
+          );
+
+        return yield* Option.match(result, {
+          onNone: () => Effect.fail(new TodoNotFoundError({ id })),
+          onSome: (row) => Schema.decodeUnknownEffect(Todo)(row).pipe(Effect.orDie),
+        });
       });
 
       const create = Effect.fn("TodoRepository.create")(function* (input: CreateTodoInput) {
         const now = yield* DateTime.nowAsDate;
-        const rows = yield* db
+        const todo = yield* db
           .insert(todos)
           .values({ title: input.title, completed: false, createdAt: now, updatedAt: now })
           .returning()
-          .pipe(Effect.orDie);
-        return toTodo(rows[0]!);
+          .pipe(
+            Effect.map(Array.head),
+            Effect.orDie
+          );
+        return yield* Option.match(todo, {
+          onNone: () => Effect.die(new Error("Failed to create todo")),
+          onSome: (row) => Schema.decodeUnknownEffect(Todo)(row).pipe(Effect.orDie),
+        });
       });
 
       const update = Effect.fn("TodoRepository.update")(function* (
@@ -74,29 +78,35 @@ export class TodoRepository extends Context.Service<
           patch.completed = input.completed;
         }
 
-        const rows = yield* db
+        const todo = yield* db
           .update(todos)
           .set(patch)
           .where(eq(todos.id, id))
           .returning()
-          .pipe(Effect.orDie);
+          .pipe(
+            Effect.map(Array.head),
+            Effect.orDie
+          );
 
-        const row = rows[0];
-        if (row === undefined) {
-          return yield* new TodoNotFoundError({ id });
-        }
-        return toTodo(row);
+        return yield* Option.match(todo, {
+          onNone: () => Effect.fail(new TodoNotFoundError({ id })),
+          onSome: (row) => Schema.decodeUnknownEffect(Todo)(row).pipe(Effect.orDie),
+        });
       });
 
       const remove = Effect.fn("TodoRepository.remove")(function* (id: TodoId) {
-        const rows = yield* db
+        const todo = yield* db
           .delete(todos)
           .where(eq(todos.id, id))
           .returning({ id: todos.id })
-          .pipe(Effect.orDie);
-        if (rows.length === 0) {
-          return yield* new TodoNotFoundError({ id });
-        }
+          .pipe(
+            Effect.map(Array.head),
+            Effect.orDie
+          );
+        return yield* Option.match(todo, {
+          onNone: () => Effect.fail(new TodoNotFoundError({ id })),
+          onSome: (row) => Effect.succeed(row.id),
+        });
       });
 
       return TodoRepository.of({ list, findById, create, update, remove });

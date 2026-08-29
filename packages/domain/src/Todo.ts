@@ -21,8 +21,8 @@ export class Todo extends Schema.Class<Todo>("domain/Todo")({
   id: TodoId,
   title: TodoTitle,
   completed: Schema.Boolean,
-  createdAt: Schema.DateTimeUtcFromString,
-  updatedAt: Schema.DateTimeUtcFromString,
+  createdAt: Schema.DateTimeUtcFromDate,
+  updatedAt: Schema.DateTimeUtcFromDate,
 }) {}
 
 export type TodoEncoded = typeof Todo.Encoded;
