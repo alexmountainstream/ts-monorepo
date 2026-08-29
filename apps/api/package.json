@@ -9,15 +9,21 @@
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
-    "format": "oxfmt"
+    "format": "oxfmt",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
+    "@effect/sql-pg": "catalog:",
     "@ts-monorepo/domain": "workspace:*",
+    "drizzle-orm": "1.0.0-rc.5-169397b",
     "effect": "catalog:"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
+    "drizzle-kit": "1.0.0-rc.5-ab785fc",
     "tsdown": "^0.22.14",
     "tsx": "^4.23.12"
   }
